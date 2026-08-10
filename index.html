@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Casilleros disponibles</title>
+    <meta
+      name="description"
+      content="Visualizaci&oacute;n de disponibilidad, reserva y pago de casilleros con formulario de reserva."
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Mapa de casilleros</p>
+        <h1>Disponibilidad de casilleros</h1>
+      </div>
+      <a
+        class="source-link"
+        href="https://forms.gle/t8n4u23AVMQQapDR9"
+        target="_blank"
+        rel="noreferrer"
+      >
+        Reservar casillero
+      </a>
+    </header>
+
+    <main class="page-shell">
+      <section class="summary" aria-label="Resumen de disponibilidad">
+        <article class="metric metric-total">
+          <span>Total</span>
+          <strong id="total-count">66</strong>
+        </article>
+        <article class="metric metric-available">
+          <span>Disponibles</span>
+          <strong id="available-count">--</strong>
+        </article>
+        <article class="metric metric-reserved">
+          <span>Reservados</span>
+          <strong id="reserved-count">--</strong>
+        </article>
+        <article class="metric metric-paid">
+          <span>Pagados</span>
+          <strong id="paid-count">--</strong>
+        </article>
+      </section>
+
+      <section class="controls" aria-label="Controles del mapa">
+        <label class="search-box">
+          <span>Buscar casillero</span>
+          <input id="locker-search" inputmode="numeric" placeholder="Ej. 24" />
+        </label>
+
+        <div class="control-group" aria-label="Filtrar por estado">
+          <button class="filter-button active" type="button" data-filter="todos">
+            Todos
+          </button>
+          <button class="filter-button" type="button" data-filter="disponible">
+            Disponibles
+          </button>
+          <button class="filter-button" type="button" data-filter="reservado">
+            Reservados
+          </button>
+          <button class="filter-button" type="button" data-filter="pagado">
+            Pagados
+          </button>
+        </div>
+
+        <div class="control-group" aria-label="Filtrar por tama&ntilde;o">
+          <button class="size-button active" type="button" data-size="todos">
+            Todos
+          </button>
+          <button class="size-button" type="button" data-size="pequeno">
+            Peque&ntilde;os
+          </button>
+          <button class="size-button" type="button" data-size="grande">
+            Grandes
+          </button>
+        </div>
+
+        <button id="refresh-button" class="refresh-button" type="button">
+          Actualizar
+        </button>
+      </section>
+
+      <section class="status-line" aria-live="polite">
+        <span id="load-status">Cargando datos de Google Sheets...</span>
+        <span id="updated-at"></span>
+      </section>
+
+      <section class="workspace">
+        <div class="map-panel" aria-label="Plano de casilleros">
+          <div class="legend" aria-label="Leyenda">
+            <span><i class="swatch swatch-available"></i>Disponible</span>
+            <span><i class="swatch swatch-reserved"></i>Reservado</span>
+            <span><i class="swatch swatch-paid"></i>Pagado</span>
+            <span id="unknown-legend" hidden><i class="swatch swatch-unknown"></i>Sin datos</span>
+          </div>
+          <div class="map-scroll" tabindex="0" aria-label="Mapa desplazable">
+            <div id="locker-grid" class="locker-grid"></div>
+          </div>
+        </div>
+
+        <aside class="detail-panel" aria-label="Detalle de casillero">
+          <p class="panel-kicker">Selecci&oacute;n</p>
+          <h2 id="detail-title">Elige un casillero</h2>
+          <dl>
+            <div>
+              <dt>Estado</dt>
+              <dd id="detail-status">--</dd>
+            </div>
+            <div>
+              <dt>Tama&ntilde;o</dt>
+              <dd id="detail-size">--</dd>
+            </div>
+            <div>
+              <dt>Ubicaci&oacute;n</dt>
+              <dd id="detail-location">--</dd>
+            </div>
+            <div>
+              <dt>Registros</dt>
+              <dd id="detail-records">--</dd>
+            </div>
+            <div>
+              <dt>Reserva</dt>
+              <dd>
+                <a
+                  id="detail-form-link"
+                  href="https://forms.gle/t8n4u23AVMQQapDR9"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Abrir formulario
+                </a>
+              </dd>
+            </div>
+          </dl>
+        </aside>
+      </section>
+
+      <section class="form-panel" aria-label="Formulario de reserva">
+        <div class="form-header">
+          <div>
+            <p class="panel-kicker">Reserva</p>
+            <h2>Formulario de reserva</h2>
+          </div>
+          <a
+            class="form-open-link"
+            href="https://forms.gle/t8n4u23AVMQQapDR9"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Abrir en otra pesta&ntilde;a
+          </a>
+        </div>
+        <iframe
+          class="reservation-frame"
+          title="Formulario de reserva de casillero"
+          src="https://forms.gle/t8n4u23AVMQQapDR9"
+          loading="lazy"
+        ></iframe>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>
