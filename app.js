@@ -276,6 +276,10 @@ async function loadSheet() {
     if (APPS_SCRIPT_URL) {
       const response = await loadAppsScriptStatus();
       state.statusByLocker = buildLockerStatusFromPayload(response);
+      if (state.statusByLocker.size === 0) {
+        const sheetResponse = await loadGoogleSheetJson();
+        state.statusByLocker = buildLockerStatus(tableToRows(sheetResponse.table));
+      }
     } else {
       const response = await loadGoogleSheetJson();
       const rows = tableToRows(response.table);

@@ -25,7 +25,14 @@ const ORIGINAL_COLUMNS = {
   name: ["nombre completo", "nombre", "estudiante"],
   carnet: ["carne", "carnet"],
   email: ["correo electronico", "correo", "email"],
-  locker: ["numero deseado", "numero de casillero reservado", "casillero", "locker"],
+  locker: [
+    "numero de casillero deseado",
+    "casillero deseado",
+    "numero deseado",
+    "numero de casillero reservado",
+    "casillero reservado",
+    "locker",
+  ],
 };
 
 function doGet(event) {
@@ -281,12 +288,27 @@ function upsertAssignment(sheet, record) {
 function detectOriginalColumns(headers) {
   const result = {};
   Object.keys(ORIGINAL_COLUMNS).forEach((key) => {
-    result[key] = headers.find((header) => {
-      const normalizedHeader = normalizeText(header);
-      return ORIGINAL_COLUMNS[key].some((candidate) => normalizedHeader.indexOf(normalizeText(candidate)) !== -1);
-    }) || "";
+    result[key] = findBestHeader(headers, ORIGINAL_COLUMNS[key]);
   });
   return result;
+}
+
+function findBestHeader(headers, candidates) {
+  const scored = headers.map((header) => {
+    const normalizedHeader = normalizeText(header);
+    const score = candidates.reduce((best, candidate, index) => {
+      const normalizedCandidate = normalizeText(candidate);
+      if (normalizedHeader.indexOf(normalizedCandidate) === -1) {
+        return best;
+      }
+      const specificity = normalizedCandidate.length * 10;
+      const orderBonus = candidates.length - index;
+      return Math.max(best, specificity + orderBonus);
+    }, 0);
+    return { header, score };
+  });
+  scored.sort((a, b) => b.score - a.score);
+  return scored[0] && scored[0].score ? scored[0].header : "";
 }
 
 function mapAssignmentsByRow(assignments) {

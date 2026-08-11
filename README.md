@@ -48,6 +48,8 @@ GitHub Pages no puede modificar Google Sheets directamente sin un endpoint de Go
 7. En `app.js`, pega esa misma URL en `APPS_SCRIPT_URL`.
 8. En `admin.js`, pega el mismo token en `ADMIN_TOKEN`.
 
+Cada vez que cambies `apps-script.gs`, vuelve a desplegarlo con `Deploy > Manage deployments > Edit > Version > New version > Deploy`. Si no haces eso, Google sigue ejecutando la version anterior aunque hayas pegado codigo nuevo.
+
 El Apps Script crea una hoja auxiliar llamada `Asignaciones`. Ahi guarda casillero asignado, estado, monto, factura y fecha. La hoja original solo se edita cuando el estado sea `Pagado`: en ese caso pone `SI` en la columna H `Pago`.
 
 Los casilleros reservados o pagados no salen como disponibles. El panel admin muestra una ventana `Solicitudes reservadas` para revisar cuales casilleros estan bloqueados.

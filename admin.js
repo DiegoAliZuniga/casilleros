@@ -108,7 +108,16 @@ const columnCandidates = {
   career: ["carrera"],
   phone: ["telefono", "tel\u00e9fono", "celular"],
   email: ["correo electronico", "correo electr\u00f3nico", "correo", "email"],
-  desiredLocker: ["numero deseado", "n\u00famero deseado", "numero de casillero reservado", "casillero", "locker"],
+  desiredLocker: [
+    "numero de casillero deseado",
+    "n\u00famero de casillero deseado",
+    "casillero deseado",
+    "numero deseado",
+    "n\u00famero deseado",
+    "numero de casillero reservado",
+    "casillero reservado",
+    "locker",
+  ],
   payment: ["estatus de pago", "estado de pago", "pago", "pagado"],
 };
 
@@ -639,9 +648,27 @@ function detectColumns(headers) {
   return Object.fromEntries(
     Object.entries(columnCandidates).map(([key, candidates]) => [
       key,
-      headers.find((header) => candidates.some((candidate) => normalize(header).includes(normalize(candidate)))) || "",
+      findBestHeader(headers, candidates),
     ]),
   );
+}
+
+function findBestHeader(headers, candidates) {
+  const scored = headers.map((header) => {
+    const normalizedHeader = normalize(header);
+    const score = candidates.reduce((best, candidate, index) => {
+      const normalizedCandidate = normalize(candidate);
+      if (!normalizedHeader.includes(normalizedCandidate)) {
+        return best;
+      }
+      const specificity = normalizedCandidate.length * 10;
+      const orderBonus = candidates.length - index;
+      return Math.max(best, specificity + orderBonus);
+    }, 0);
+    return { header, score };
+  });
+  scored.sort((a, b) => b.score - a.score);
+  return scored[0]?.score ? scored[0].header : "";
 }
 
 function loadGoogleSheetJson() {
