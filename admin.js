@@ -2,6 +2,7 @@ const SHEET_ID = "1sEH73Eyg8cRJe2as8wF0_YZA-TAYJbW2qq186MNIkhk";
 const SHEET_GID = "0";
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzsln0pIuvGu9c9xJipl4cY-U_nYVEzi_5a9dokjPDIU9clwtItRRWnCR72QDJbyLTPsg/exec";
 const ADMIN_TOKEN = "cambia-este-token";
+const FIRST_INVOICE_NUMBER = 201;
 
 const LOCKERS = [
   locker("19", 1, 1, 2, 1),
@@ -491,7 +492,7 @@ async function copySheetValues() {
     `Estado: ${statusLabel(elements.statusSelect.value)}`,
     `Monto: ${elements.amountInput.value || "(sin monto)"}`,
     `Factura: ${elements.receiptInput.value || "(se asigna al pagar)"}`,
-    `Pago original H: ${elements.statusSelect.value === "pagado" ? "S" : "(sin cambio)"}`,
+    `Pago original H: ${elements.statusSelect.value === "pagado" ? "SI" : "(sin cambio)"}`,
   ].join("\n");
 
   try {

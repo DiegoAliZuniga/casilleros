@@ -1,6 +1,7 @@
 const SHEET_ID = "1sEH73Eyg8cRJe2as8wF0_YZA-TAYJbW2qq186MNIkhk";
 const SHEET_GID = "0";
 const FORM_URL = "https://forms.gle/t8n4u23AVMQQapDR9";
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzsln0pIuvGu9c9xJipl4cY-U_nYVEzi_5a9dokjPDIU9clwtItRRWnCR72QDJbyLTPsg/exec";
 
 const LOCKERS = [
   locker("19", 1, 1, 2, 1),
@@ -272,9 +273,14 @@ async function loadSheet() {
   renderGrid();
 
   try {
-    const response = await loadGoogleSheetJson();
-    const rows = tableToRows(response.table);
-    state.statusByLocker = buildLockerStatus(rows);
+    if (APPS_SCRIPT_URL) {
+      const response = await loadAppsScriptStatus();
+      state.statusByLocker = buildLockerStatusFromPayload(response);
+    } else {
+      const response = await loadGoogleSheetJson();
+      const rows = tableToRows(response.table);
+      state.statusByLocker = buildLockerStatus(rows);
+    }
     state.dataLoaded = true;
     elements.loadStatus.textContent = "Datos conectados desde Google Sheets.";
     elements.updatedAt.textContent = `Actualizado ${formatTime(new Date())}`;
@@ -289,6 +295,43 @@ async function loadSheet() {
     elements.refresh.disabled = false;
     renderGrid();
   }
+}
+
+function loadAppsScriptStatus() {
+  return new Promise((resolve, reject) => {
+    const callbackName = `__casilleros_status_${Date.now()}_${Math.round(Math.random() * 100000)}`;
+    const script = document.createElement("script");
+    const timeout = window.setTimeout(() => {
+      cleanup();
+      reject(new Error("El estado tardo demasiado en responder."));
+    }, 12000);
+
+    window[callbackName] = (payload) => {
+      cleanup();
+      if (!payload?.ok) {
+        reject(new Error(payload?.error || "Apps Script no devolvio datos."));
+        return;
+      }
+      resolve(payload);
+    };
+
+    script.onerror = () => {
+      cleanup();
+      reject(new Error("No se pudo conectar con el Apps Script."));
+    };
+
+    const url = new URL(APPS_SCRIPT_URL);
+    url.searchParams.set("action", "status");
+    url.searchParams.set("callback", callbackName);
+    script.src = url.toString();
+    document.body.append(script);
+
+    function cleanup() {
+      window.clearTimeout(timeout);
+      delete window[callbackName];
+      script.remove();
+    }
+  });
 }
 
 function loadGoogleSheetJson() {
@@ -328,6 +371,20 @@ function loadGoogleSheetJson() {
       script.remove();
     }
   });
+}
+
+function buildLockerStatusFromPayload(payload) {
+  const statusMap = new Map();
+  Object.entries(payload.statuses || {}).forEach(([lockerId, status]) => {
+    if (!lockerIds.has(lockerId)) {
+      return;
+    }
+    statusMap.set(lockerId, {
+      count: Number(status.count || 1),
+      paid: Boolean(status.paid || status.status === "pagado"),
+    });
+  });
+  return statusMap;
 }
 
 function tableToRows(table) {

@@ -3,7 +3,7 @@
 Este sitio esta listo para subirlo a GitHub Pages. Incluye:
 
 - `index.html`: mapa publico de casilleros.
-- `admin.html`: panel administrativo para seleccionar reservas, asignar casillero, marcar pago y preparar contrato.
+- `admin.html`: panel administrativo para seleccionar reservas, ver solicitudes reservadas, asignar casillero, marcar pago y preparar contrato.
 - `apps-script.gs`: codigo opcional para que el panel admin pueda escribir cambios en Google Sheets.
 
 ## Como publicarlo
@@ -37,7 +37,7 @@ Cada fila del formulario cuenta como reservado. Si la columna `Pago` tiene `SI`,
 
 ## Escritura desde el admin
 
-GitHub Pages no puede modificar Google Sheets directamente sin un endpoint de Google. Para activar el boton `Guardar en Sheet`:
+GitHub Pages no puede modificar Google Sheets directamente sin un endpoint de Google. Para activar el boton `Guardar asignacion`:
 
 1. Abre `Extensions > Apps Script` desde el Google Sheet.
 2. Pega el contenido de `apps-script.gs`.
@@ -45,8 +45,18 @@ GitHub Pages no puede modificar Google Sheets directamente sin un endpoint de Go
 4. Publica con `Deploy > New deployment > Web app`.
 5. Copia la URL del Web App.
 6. En `admin.js`, pega esa URL en `APPS_SCRIPT_URL`.
-7. En `admin.js`, pega el mismo token en `ADMIN_TOKEN`.
+7. En `app.js`, pega esa misma URL en `APPS_SCRIPT_URL`.
+8. En `admin.js`, pega el mismo token en `ADMIN_TOKEN`.
 
-Cuando el estado sea `Pagado`, el panel actualiza la columna de casillero y pone `Pago` en `SI`. Cuando sea `Reservado`, deja `Pago` en `NO`. Cuando sea `Disponible`, libera el casillero.
+El Apps Script crea una hoja auxiliar llamada `Asignaciones`. Ahi guarda casillero asignado, estado, monto, factura y fecha. La hoja original solo se edita cuando el estado sea `Pagado`: en ese caso pone `SI` en la columna H `Pago`.
+
+Los casilleros reservados o pagados no salen como disponibles. El panel admin muestra una ventana `Solicitudes reservadas` para revisar cuales casilleros estan bloqueados.
+
+El monto se calcula automaticamente:
+
+- Casillero grande: `₡3000`
+- Casillero pequeno: `₡4000`
+
+El numero de factura inicia en `2026-201` y el Apps Script lleva el consecutivo revisando las facturas guardadas en `Asignaciones`.
 
 Si cambia el formulario, edita `FORM_URL` en `app.js`. Si cambia la hoja, edita `SHEET_ID` y `SHEET_GID` en `app.js` y `admin.js`.

@@ -167,7 +167,7 @@ function updateAssignment(event) {
     if (!responseSheet.getRange(1, ORIGINAL_PAYMENT_COLUMN).getValue()) {
       responseSheet.getRange(1, ORIGINAL_PAYMENT_COLUMN).setValue("Pago");
     }
-    responseSheet.getRange(rowNumber, ORIGINAL_PAYMENT_COLUMN).setValue("S");
+    responseSheet.getRange(rowNumber, ORIGINAL_PAYMENT_COLUMN).setValue("SI");
   }
 
   return {
