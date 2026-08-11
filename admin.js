@@ -73,6 +73,7 @@ const LOCKERS = [
 ];
 
 const lockerIds = new Set(LOCKERS.map((item) => item.id));
+const lockersById = new Map(LOCKERS.map((item) => [item.id, item]));
 const elements = {
   loadStatus: document.querySelector("#admin-load-status"),
   updatedAt: document.querySelector("#admin-updated-at"),
@@ -82,6 +83,7 @@ const elements = {
   form: document.querySelector("#assignment-form"),
   selectedTitle: document.querySelector("#selected-person-title"),
   lockerSelect: document.querySelector("#locker-select"),
+  lockerNote: document.querySelector("#locker-note"),
   statusSelect: document.querySelector("#status-select"),
   paymentSelect: document.querySelector("#payment-select"),
   receiptInput: document.querySelector("#receipt-input"),
@@ -92,6 +94,11 @@ const elements = {
   saveStatus: document.querySelector("#save-status"),
   contract: document.querySelector("#contract-preview"),
   printButton: document.querySelector("#print-contract-button"),
+  reservedCount: document.querySelector("#reserved-request-count"),
+  openReserved: document.querySelector("#open-reserved-button"),
+  closeReserved: document.querySelector("#close-reserved-button"),
+  reservedDialog: document.querySelector("#reserved-dialog"),
+  reservedList: document.querySelector("#reserved-request-list"),
 };
 
 const columnCandidates = {
@@ -100,14 +107,16 @@ const columnCandidates = {
   career: ["carrera"],
   phone: ["telefono", "tel\u00e9fono", "celular"],
   email: ["correo electronico", "correo electr\u00f3nico", "correo", "email"],
-  locker: ["numero deseado", "n\u00famero deseado", "numero de casillero reservado", "casillero", "locker"],
+  desiredLocker: ["numero deseado", "n\u00famero deseado", "numero de casillero reservado", "casillero", "locker"],
   payment: ["estatus de pago", "estado de pago", "pago", "pagado"],
-  status: ["estado", "estatus", "status"],
 };
 
 const state = {
   rows: [],
   columns: {},
+  assignments: [],
+  assignmentsByRow: new Map(),
+  nextInvoice: formatInvoice(FIRST_INVOICE_NUMBER),
   search: "",
   selectedRowNumber: null,
 };
@@ -117,6 +126,7 @@ init();
 function init() {
   fillLockerOptions();
   wireControls();
+  setCalculatedValues();
   renderContract();
   loadSheet();
 }
@@ -132,37 +142,35 @@ function locker(id, row, col, rowSpan, colSpan) {
   };
 }
 
-function fillLockerOptions() {
-  const sorted = [...LOCKERS].sort((a, b) => Number(a.id) - Number(b.id));
-  elements.lockerSelect.innerHTML = '<option value="">Sin casillero</option>';
-  sorted.forEach((item) => {
-    const option = document.createElement("option");
-    option.value = item.id;
-    option.textContent = `${item.id} - ${sizeLabel(item.size)}`;
-    elements.lockerSelect.append(option);
-  });
-}
-
 function wireControls() {
   elements.refresh.addEventListener("click", () => loadSheet());
   elements.search.addEventListener("input", (event) => {
     state.search = event.target.value.trim();
     renderReservations();
   });
-  elements.statusSelect.addEventListener("change", () => {
-    syncPaymentFromStatus();
+  elements.lockerSelect.addEventListener("change", () => {
+    setCalculatedValues();
     renderContract();
   });
-  [
-    elements.lockerSelect,
-    elements.paymentSelect,
-    elements.receiptInput,
-    elements.amountInput,
-    elements.paymentDateInput,
-  ].forEach((element) => element.addEventListener("input", renderContract));
+  elements.statusSelect.addEventListener("change", () => {
+    syncPaymentFromStatus();
+    setCalculatedValues();
+    renderContract();
+  });
+  elements.paymentSelect.addEventListener("change", () => {
+    syncStatusFromPayment();
+    setCalculatedValues();
+    renderContract();
+  });
+  elements.paymentDateInput.addEventListener("input", renderContract);
   elements.form.addEventListener("submit", saveAssignment);
   elements.copyButton.addEventListener("click", copySheetValues);
   elements.printButton.addEventListener("click", () => window.print());
+  elements.openReserved.addEventListener("click", () => {
+    renderReservedRequests();
+    elements.reservedDialog.showModal();
+  });
+  elements.closeReserved.addEventListener("click", () => elements.reservedDialog.close());
 }
 
 async function loadSheet() {
@@ -172,26 +180,64 @@ async function loadSheet() {
   setSaveStatus("");
 
   try {
-    const response = await loadGoogleSheetJson();
-    const parsed = tableToRows(response.table);
-    state.rows = parsed.rows;
-    state.columns = detectColumns(parsed.headers);
-    elements.loadStatus.textContent = `${state.rows.length} reservas cargadas.`;
+    if (APPS_SCRIPT_URL) {
+      await loadFromAppsScript();
+    } else {
+      await loadFromPublishedSheet();
+      setSaveStatus("Lectura en modo basico. Configura APPS_SCRIPT_URL para guardar asignaciones y facturas.");
+    }
+
+    elements.loadStatus.textContent = `${state.rows.length} solicitudes cargadas.`;
     elements.updatedAt.textContent = `Actualizado ${formatTime(new Date())}`;
     if (!state.selectedRowNumber && state.rows[0]) {
       selectRow(state.rows[0].__rowNumber);
+    } else {
+      refreshLockerOptions();
+      renderReservations();
+      renderReservedRequests();
+      setCalculatedValues();
+      renderContract();
     }
-    renderReservations();
   } catch (error) {
     state.rows = [];
     state.columns = {};
-    elements.loadStatus.textContent =
-      "No se pudieron cargar las reservas. Revisa que la hoja este compartida como publica.";
+    state.assignments = [];
+    state.assignmentsByRow = new Map();
+    elements.loadStatus.textContent = "No se pudieron cargar las solicitudes.";
     setSaveStatus(error instanceof Error ? error.message : "Error al leer la hoja.", "error");
     renderReservations();
+    renderReservedRequests();
   } finally {
     elements.refresh.disabled = false;
   }
+}
+
+async function loadFromAppsScript() {
+  const payload = await callAppsScript({
+    action: "list",
+    token: ADMIN_TOKEN,
+  });
+  if (!payload.ok) {
+    throw new Error(payload.error || "Apps Script no devolvio datos.");
+  }
+  state.rows = (payload.rows || []).map((row) => ({
+    __rowNumber: Number(row.rowNumber),
+    ...(row.values || {}),
+  }));
+  state.columns = detectColumns(payload.headers || []);
+  state.assignments = payload.assignments || [];
+  state.assignmentsByRow = new Map(state.assignments.map((assignment) => [Number(assignment.rowNumber), assignment]));
+  state.nextInvoice = payload.nextInvoice || getNextInvoiceFromAssignments(state.assignments);
+}
+
+async function loadFromPublishedSheet() {
+  const response = await loadGoogleSheetJson();
+  const parsed = tableToRows(response.table);
+  state.rows = parsed.rows;
+  state.columns = detectColumns(parsed.headers);
+  state.assignments = [];
+  state.assignmentsByRow = new Map();
+  state.nextInvoice = formatInvoice(FIRST_INVOICE_NUMBER);
 }
 
 function renderReservations() {
@@ -200,14 +246,15 @@ function renderReservations() {
   if (!rows.length) {
     const empty = document.createElement("p");
     empty.className = "save-status";
-    empty.textContent = "No hay reservas para mostrar.";
+    empty.textContent = "No hay solicitudes para mostrar.";
     elements.list.append(empty);
     return;
   }
 
   rows.forEach((row) => {
     const person = getPerson(row);
-    const status = getRowStatus(row);
+    const status = getEffectiveStatus(row);
+    const assignment = getAssignment(row);
     const button = document.createElement("button");
     button.type = "button";
     button.className = "reservation-row";
@@ -217,11 +264,41 @@ function renderReservations() {
         <span class="reservation-name">${escapeHtml(person.name || "Sin nombre")}</span>
         <span class="reservation-meta">${escapeHtml([person.carnet, person.email].filter(Boolean).join(" / ") || "Sin contacto")}</span>
       </span>
-      <span class="reservation-locker">${escapeHtml(person.locker ? `#${person.locker}` : "Sin #")}</span>
+      <span class="reservation-locker">${escapeHtml(lockerBadge(person, assignment))}</span>
       <span class="reservation-state" data-state="${status}">${escapeHtml(statusLabel(status))}</span>
     `;
     button.addEventListener("click", () => selectRow(row.__rowNumber));
     elements.list.append(button);
+  });
+}
+
+function renderReservedRequests() {
+  const blocked = getBlockedLockers();
+  const rows = [...blocked.values()].sort((a, b) => Number(a.locker) - Number(b.locker));
+  elements.reservedCount.textContent = String(rows.length);
+  elements.reservedList.innerHTML = "";
+
+  if (!rows.length) {
+    const empty = document.createElement("p");
+    empty.className = "save-status";
+    empty.textContent = "No hay casilleros bloqueados por solicitudes.";
+    elements.reservedList.append(empty);
+    return;
+  }
+
+  rows.forEach((entry) => {
+    const item = document.createElement("article");
+    item.className = "reserved-request";
+    item.innerHTML = `
+      <strong>#${escapeHtml(entry.locker)}</strong>
+      <span>
+        ${escapeHtml(entry.name || "Sin nombre")}
+        <small>${escapeHtml(entry.email || entry.carnet || "Sin contacto")}</small>
+      </span>
+      <span>${escapeHtml(statusLabel(entry.status))}</span>
+      <span>${escapeHtml(formatCurrency(priceForLocker(entry.locker)))}</span>
+    `;
+    elements.reservedList.append(item);
   });
 }
 
@@ -232,7 +309,15 @@ function filteredRows() {
   const needle = normalize(state.search);
   return state.rows.filter((row) => {
     const person = getPerson(row);
-    return normalize(Object.values(person).join(" ")).includes(needle);
+    const assignment = getAssignment(row);
+    return normalize([
+      person.name,
+      person.carnet,
+      person.email,
+      person.desiredLocker,
+      assignment?.locker,
+      assignment?.invoice,
+    ].join(" ")).includes(needle);
   });
 }
 
@@ -244,17 +329,23 @@ function selectRow(rowNumber) {
   }
 
   const person = getPerson(row);
-  const status = getRowStatus(row);
+  const assignment = getAssignment(row);
+  const status = getEffectiveStatus(row);
+  const selectedLocker = assignment?.locker || person.desiredLocker || "";
+
   elements.selectedTitle.textContent = person.name || `Fila ${row.__rowNumber}`;
-  elements.lockerSelect.value = person.locker || "";
+  elements.lockerSelect.value = selectedLocker;
   elements.statusSelect.value = status;
-  elements.paymentSelect.value = status === "pagado" || isPaidValue(person.payment) ? "SI" : "NO";
-  elements.receiptInput.value = "";
-  elements.amountInput.value = "";
-  elements.paymentDateInput.value = new Date().toISOString().slice(0, 10);
-  setSaveStatus(APPS_SCRIPT_URL ? "" : "Para guardar directo en el Sheet, configura APPS_SCRIPT_URL en admin.js.");
+  elements.paymentSelect.value = status === "pagado" ? "SI" : "NO";
+  elements.paymentDateInput.value = assignment?.paymentDate || new Date().toISOString().slice(0, 10);
+
+  refreshLockerOptions();
+  setCalculatedValues();
   renderReservations();
+  renderReservedRequests();
   renderContract();
+
+  setSaveStatus(APPS_SCRIPT_URL ? "" : "Para guardar directo, configura APPS_SCRIPT_URL en admin.js.");
 }
 
 function selectedRow() {
@@ -264,29 +355,108 @@ function selectedRow() {
 function syncPaymentFromStatus() {
   if (elements.statusSelect.value === "pagado") {
     elements.paymentSelect.value = "SI";
-  }
-  if (elements.statusSelect.value === "reservado") {
+  } else {
     elements.paymentSelect.value = "NO";
   }
-  if (elements.statusSelect.value === "disponible") {
-    elements.paymentSelect.value = "NO";
+}
+
+function syncStatusFromPayment() {
+  if (elements.paymentSelect.value === "SI") {
+    elements.statusSelect.value = "pagado";
+  } else if (elements.statusSelect.value === "pagado") {
+    elements.statusSelect.value = "reservado";
   }
+}
+
+function setCalculatedValues() {
+  const lockerId = elements.lockerSelect.value;
+  const status = elements.statusSelect.value;
+  const assignment = selectedRow() ? getAssignment(selectedRow()) : null;
+  const amount = lockerId && status !== "disponible" ? priceForLocker(lockerId) : "";
+  const invoice = status === "pagado" ? assignment?.invoice || state.nextInvoice || formatInvoice(FIRST_INVOICE_NUMBER) : "";
+
+  elements.amountInput.value = amount ? formatCurrency(amount) : "";
+  elements.receiptInput.value = invoice;
+  elements.lockerNote.textContent = lockerId
+    ? `${sizeLabel(lockersById.get(lockerId)?.size)}: ${amount ? formatCurrency(amount) : "sin monto"}`
+    : "Selecciona un casillero para calcular monto y bloqueo.";
+}
+
+function refreshLockerOptions() {
+  const selectedValue = elements.lockerSelect.value;
+  fillLockerOptions(selectedValue);
+  elements.lockerSelect.value = selectedValue;
+}
+
+function fillLockerOptions(currentValue = "") {
+  const selectedRowNumber = state.selectedRowNumber;
+  const blocked = getBlockedLockers();
+  const sorted = [...LOCKERS].sort((a, b) => Number(a.id) - Number(b.id));
+  elements.lockerSelect.innerHTML = '<option value="">Sin casillero</option>';
+
+  sorted.forEach((item) => {
+    const blockedEntry = blocked.get(item.id);
+    const isBlockedByOther = blockedEntry && blockedEntry.rowNumber !== selectedRowNumber;
+    const option = document.createElement("option");
+    option.value = item.id;
+    option.disabled = Boolean(isBlockedByOther);
+    option.textContent = [
+      item.id,
+      sizeLabel(item.size),
+      formatCurrency(priceForLocker(item.id)),
+      isBlockedByOther ? `ocupado por ${blockedEntry.name || `fila ${blockedEntry.rowNumber}`}` : "",
+    ].filter(Boolean).join(" - ");
+    elements.lockerSelect.append(option);
+  });
+
+  if (currentValue && !elements.lockerSelect.value) {
+    elements.lockerSelect.value = currentValue;
+  }
+}
+
+function getBlockedLockers() {
+  const blocked = new Map();
+  state.rows.forEach((row) => {
+    const person = getPerson(row);
+    const assignment = getAssignment(row);
+    const status = getEffectiveStatus(row);
+    if (status === "disponible") {
+      return;
+    }
+    const lockerId = assignment?.locker || person.desiredLocker;
+    if (!lockerId) {
+      return;
+    }
+    blocked.set(lockerId, {
+      rowNumber: row.__rowNumber,
+      locker: lockerId,
+      name: person.name,
+      email: person.email,
+      carnet: person.carnet,
+      status,
+    });
+  });
+  return blocked;
 }
 
 async function saveAssignment(event) {
   event.preventDefault();
   const row = selectedRow();
   if (!row) {
-    setSaveStatus("Selecciona una reserva antes de guardar.", "error");
+    setSaveStatus("Selecciona una solicitud antes de guardar.", "error");
     return;
   }
   if (!APPS_SCRIPT_URL) {
-    setSaveStatus("Falta configurar APPS_SCRIPT_URL en admin.js para escribir en el Sheet.", "error");
+    setSaveStatus("Falta configurar APPS_SCRIPT_URL en admin.js para escribir la hoja auxiliar.", "error");
+    return;
+  }
+  if (elements.statusSelect.value !== "disponible" && !elements.lockerSelect.value) {
+    setSaveStatus("Selecciona un casillero antes de guardar.", "error");
     return;
   }
 
   elements.saveButton.disabled = true;
-  setSaveStatus("Guardando cambios...");
+  setSaveStatus("Guardando asignacion...");
 
   try {
     const payload = await callAppsScript({
@@ -294,13 +464,13 @@ async function saveAssignment(event) {
       rowNumber: row.__rowNumber,
       locker: elements.statusSelect.value === "disponible" ? "" : elements.lockerSelect.value,
       status: elements.statusSelect.value,
-      payment: elements.paymentSelect.value,
+      paymentDate: elements.paymentDateInput.value,
       token: ADMIN_TOKEN,
     });
     if (!payload.ok) {
       throw new Error(payload.error || "No se pudo guardar.");
     }
-    setSaveStatus("Cambios guardados en el Sheet.", "success");
+    setSaveStatus("Asignacion guardada. La hoja original solo se toca si el estado es Pagado.", "success");
     await loadSheet();
   } catch (error) {
     setSaveStatus(error instanceof Error ? error.message : "No se pudo guardar.", "error");
@@ -312,21 +482,21 @@ async function saveAssignment(event) {
 async function copySheetValues() {
   const row = selectedRow();
   if (!row) {
-    setSaveStatus("Selecciona una reserva antes de copiar.", "error");
+    setSaveStatus("Selecciona una solicitud antes de copiar.", "error");
     return;
   }
-
-  const lockerValue = elements.statusSelect.value === "disponible" ? "" : elements.lockerSelect.value;
   const text = [
-    `Fila: ${row.__rowNumber}`,
-    `Numero deseado: ${lockerValue || "(vaciar)"}`,
+    `Fila original: ${row.__rowNumber}`,
+    `Casillero asignado: ${elements.statusSelect.value === "disponible" ? "(liberar)" : elements.lockerSelect.value}`,
     `Estado: ${statusLabel(elements.statusSelect.value)}`,
-    `Pago: ${elements.paymentSelect.value}`,
+    `Monto: ${elements.amountInput.value || "(sin monto)"}`,
+    `Factura: ${elements.receiptInput.value || "(se asigna al pagar)"}`,
+    `Pago original H: ${elements.statusSelect.value === "pagado" ? "S" : "(sin cambio)"}`,
   ].join("\n");
 
   try {
     await copyText(text);
-    setSaveStatus("Valores copiados para pegarlos en el Sheet.", "success");
+    setSaveStatus("Valores copiados.", "success");
   } catch {
     setSaveStatus(text, "success");
   }
@@ -341,16 +511,12 @@ function renderContract() {
     career: person.career || "",
     phone: person.phone || "",
     email: person.email || "",
-    locker: elements.lockerSelect.value || person.locker || "",
+    locker: elements.statusSelect.value === "disponible" ? "" : elements.lockerSelect.value || "",
     receipt: elements.receiptInput.value,
     amount: elements.amountInput.value,
     paymentDate: elements.paymentDateInput.value,
   };
-  elements.contract.innerHTML = `
-    ${contractCopy(values)}
-    <div class="contract-divider" aria-hidden="true"></div>
-    ${contractCopy(values)}
-  `;
+  elements.contract.innerHTML = contractCopy(values);
 }
 
 function contractCopy(values) {
@@ -426,9 +592,8 @@ function getPerson(row) {
     career: getValue(row, "career"),
     phone: getValue(row, "phone"),
     email: getValue(row, "email"),
-    locker: extractLockerId(getValue(row, "locker")),
+    desiredLocker: extractLockerId(getValue(row, "desiredLocker")),
     payment: getValue(row, "payment"),
-    status: getValue(row, "status"),
   };
 }
 
@@ -437,19 +602,36 @@ function getValue(row, columnKey) {
   return header ? String(row[header] ?? "").trim() : "";
 }
 
-function getRowStatus(row) {
-  const person = getPerson(row);
-  const explicitStatus = getReservationState(person.status);
-  if (explicitStatus) {
-    return explicitStatus;
+function getAssignment(row) {
+  return state.assignmentsByRow.get(Number(row.__rowNumber)) || null;
+}
+
+function getEffectiveStatus(row) {
+  const assignment = getAssignment(row);
+  if (assignment?.status) {
+    return normalizeStatusValue(assignment.status);
   }
-  if (isPaidValue(person.payment)) {
+  if (isPaidValue(getPerson(row).payment)) {
     return "pagado";
   }
-  if (person.locker) {
+  if (getPerson(row).desiredLocker) {
     return "reservado";
   }
   return "disponible";
+}
+
+function lockerBadge(person, assignment) {
+  const assigned = assignment?.locker || "";
+  if (assigned && person.desiredLocker && assigned !== person.desiredLocker) {
+    return `#${assigned} / solicita #${person.desiredLocker}`;
+  }
+  if (assigned) {
+    return `#${assigned}`;
+  }
+  if (person.desiredLocker) {
+    return `Solicita #${person.desiredLocker}`;
+  }
+  return "Sin #";
 }
 
 function detectColumns(headers) {
@@ -506,7 +688,7 @@ function callAppsScript(params) {
     const script = document.createElement("script");
     const timeout = window.setTimeout(() => {
       cleanup();
-      reject(new Error("La actualizacion tardo demasiado."));
+      reject(new Error("La operacion tardo demasiado."));
     }, 12000);
 
     window[callbackName] = (payload) => {
@@ -569,23 +751,28 @@ function extractLockerId(value) {
   return loose && lockerIds.has(loose[1]) ? loose[1] : "";
 }
 
-function isPaidValue(value) {
-  const normalized = normalize(value).replace(/\s+/g, "");
-  return ["si", "s", "yes", "y", "true", "1", "pagado", "pago"].includes(normalized);
+function priceForLocker(lockerId) {
+  const item = lockersById.get(String(lockerId));
+  if (!item) {
+    return 0;
+  }
+  return item.size === "grande" ? 3000 : 4000;
 }
 
-function getReservationState(value) {
+function isPaidValue(value) {
+  const normalized = normalize(value).replace(/\s+/g, "");
+  return ["s", "si", "yes", "y", "true", "1", "pagado", "pago"].includes(normalized);
+}
+
+function normalizeStatusValue(value) {
   const normalized = normalize(value).replace(/\s+/g, "");
   if (["disponible", "libre", "cancelado", "cancelada"].includes(normalized)) {
     return "disponible";
   }
-  if (["pagado", "pago", "si"].includes(normalized)) {
+  if (["pagado", "pago", "si", "s"].includes(normalized)) {
     return "pagado";
   }
-  if (["reservado", "reserva", "pendiente"].includes(normalized)) {
-    return "reservado";
-  }
-  return "";
+  return "reservado";
 }
 
 function statusLabel(status) {
@@ -598,6 +785,25 @@ function statusLabel(status) {
 
 function sizeLabel(size) {
   return size === "grande" ? "Grande" : "Pequeno";
+}
+
+function formatCurrency(value) {
+  if (!value) {
+    return "";
+  }
+  return `\u20a1${Number(value).toLocaleString("es-CR")}`;
+}
+
+function formatInvoice(number) {
+  return `2026-${number}`;
+}
+
+function getNextInvoiceFromAssignments(assignments) {
+  const max = assignments.reduce((highest, assignment) => {
+    const match = String(assignment.invoice || "").match(/^2026-(\d+)$/);
+    return match ? Math.max(highest, Number(match[1])) : highest;
+  }, FIRST_INVOICE_NUMBER - 1);
+  return formatInvoice(max + 1);
 }
 
 function formatTime(date) {
