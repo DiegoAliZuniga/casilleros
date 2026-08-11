@@ -1,7 +1,7 @@
 const SHEET_ID = "1sEH73Eyg8cRJe2as8wF0_YZA-TAYJbW2qq186MNIkhk";
 const SHEET_GID = "0";
 const APPS_SCRIPT_URL = "";
-const ADMIN_TOKEN = "";
+const ADMIN_TOKEN = "cambia-este-token";
 
 const LOCKERS = [
   locker("19", 1, 1, 2, 1),
