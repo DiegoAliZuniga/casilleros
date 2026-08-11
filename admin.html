@@ -33,9 +33,14 @@
               <p class="panel-kicker">Reservas</p>
               <h2>Personas registradas</h2>
             </div>
-            <button id="admin-refresh-button" class="refresh-button" type="button">
-              Actualizar
-            </button>
+            <div class="admin-header-actions">
+              <button id="open-reserved-button" class="secondary-button" type="button">
+                Solicitudes reservadas <span id="reserved-request-count">0</span>
+              </button>
+              <button id="admin-refresh-button" class="refresh-button" type="button">
+                Actualizar
+              </button>
+            </div>
           </div>
 
           <label class="search-box admin-search">
@@ -60,6 +65,10 @@
               <select id="locker-select"></select>
             </label>
 
+            <p class="assignment-note" id="locker-note">
+              Las solicitudes reservadas bloquean el casillero hasta que se marque como disponible.
+            </p>
+
             <label>
               <span>Estado</span>
               <select id="status-select">
@@ -79,12 +88,12 @@
 
             <label>
               <span>Factura o recibo</span>
-              <input id="receipt-input" placeholder="Ej. 2026-001" />
+              <input id="receipt-input" placeholder="2026-201" readonly />
             </label>
 
             <label>
               <span>Monto pagado</span>
-              <input id="amount-input" placeholder="Ej. 5000" />
+              <input id="amount-input" placeholder="Calculado automaticamente" readonly />
             </label>
 
             <label>
@@ -94,7 +103,7 @@
 
             <div class="assignment-actions">
               <button id="save-sheet-button" class="refresh-button" type="submit">
-                Guardar en Sheet
+                Guardar asignaci&oacute;n
               </button>
               <button id="copy-values-button" class="secondary-button" type="button">
                 Copiar valores
@@ -127,6 +136,19 @@
         <div id="contract-preview" class="contract-sheet"></div>
       </section>
     </main>
+
+    <dialog id="reserved-dialog" class="reserved-dialog">
+      <div class="reserved-dialog-header">
+        <div>
+          <p class="panel-kicker">Bloqueados</p>
+          <h2>Solicitudes reservadas</h2>
+        </div>
+        <button id="close-reserved-button" class="secondary-button" type="button">
+          Cerrar
+        </button>
+      </div>
+      <div id="reserved-request-list" class="reserved-request-list"></div>
+    </dialog>
 
     <script src="admin.js"></script>
   </body>
