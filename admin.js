@@ -784,7 +784,7 @@ function priceForLocker(lockerId) {
   if (!item) {
     return 0;
   }
-  return item.size === "grande" ? 3000 : 4000;
+  return item.size === "grande" ? 4000 : 3000;
 }
 
 function isPaidValue(value) {

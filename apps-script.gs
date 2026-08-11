@@ -4,6 +4,7 @@ const CONTROL_SHEET_NAME = "Asignaciones";
 const ADMIN_TOKEN = "cambia-este-token";
 const FIRST_INVOICE_NUMBER = 201;
 const ORIGINAL_PAYMENT_COLUMN = 8; // Columna H.
+const INVOICE_COUNTER_PROPERTY = "casilleros_2026_last_invoice_number";
 
 const CONTROL_HEADERS = [
   "Fila original",
@@ -51,7 +52,7 @@ function doGet(event) {
     }
 
     if (action === "update") {
-      return jsonp(callback, updateAssignment(event));
+      return jsonp(callback, updateAssignmentWithLock(event));
     }
 
     throw new Error("Accion no soportada.");
@@ -60,6 +61,18 @@ function doGet(event) {
       ok: false,
       error: error.message || String(error),
     });
+  }
+}
+
+function updateAssignmentWithLock(event) {
+  const lock = LockService.getDocumentLock();
+  if (!lock.tryLock(30000)) {
+    throw new Error("No se pudo reservar el consecutivo de factura. Intenta de nuevo.");
+  }
+  try {
+    return updateAssignment(event);
+  } finally {
+    lock.releaseLock();
   }
 }
 
@@ -147,7 +160,8 @@ function updateAssignment(event) {
 
   const assignments = readAssignments(controlSheet);
   const existing = assignments.find((item) => Number(item.rowNumber) === rowNumber);
-  const invoice = status === "pagado" ? existing && existing.invoice ? existing.invoice : nextInvoice(assignments) : "";
+  const existingInvoice = existing && existing.invoice ? existing.invoice : "";
+  const invoice = status === "pagado" ? existingInvoice || claimNextInvoice(assignments) : existingInvoice;
   const paymentDate = status === "pagado" ? String(event.parameter.paymentDate || todayIso()) : "";
   const amount = status === "disponible" || !locker ? "" : priceForLocker(locker);
   const payment = status === "pagado" ? "SI" : "NO";
@@ -319,11 +333,23 @@ function mapAssignmentsByRow(assignments) {
 }
 
 function nextInvoice(assignments) {
-  const max = assignments.reduce((highest, assignment) => {
+  return `2026-${highestInvoiceNumber(assignments) + 1}`;
+}
+
+function claimNextInvoice(assignments) {
+  const properties = PropertiesService.getDocumentProperties();
+  const nextNumber = highestInvoiceNumber(assignments) + 1;
+  properties.setProperty(INVOICE_COUNTER_PROPERTY, String(nextNumber));
+  return `2026-${nextNumber}`;
+}
+
+function highestInvoiceNumber(assignments) {
+  const stored = Number(PropertiesService.getDocumentProperties().getProperty(INVOICE_COUNTER_PROPERTY)) || 0;
+  const fromAssignments = assignments.reduce((highest, assignment) => {
     const match = String(assignment.invoice || "").match(/^2026-(\d+)$/);
     return match ? Math.max(highest, Number(match[1])) : highest;
   }, FIRST_INVOICE_NUMBER - 1);
-  return `2026-${max + 1}`;
+  return Math.max(stored, fromAssignments, FIRST_INVOICE_NUMBER - 1);
 }
 
 function extractLockerId(value) {
@@ -337,7 +363,7 @@ function extractLockerId(value) {
 }
 
 function priceForLocker(locker) {
-  return sizeForLocker(locker) === "Grande" ? 3000 : 4000;
+  return sizeForLocker(locker) === "Grande" ? 4000 : 3000;
 }
 
 function sizeForLocker(locker) {

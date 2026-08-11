@@ -56,9 +56,9 @@ Los casilleros reservados o pagados no salen como disponibles. El panel admin mu
 
 El monto se calcula automaticamente:
 
-- Casillero grande: `₡3000`
-- Casillero pequeno: `₡4000`
+- Casillero grande: `CRC 4,000`
+- Casillero pequeno: `CRC 3,000`
 
-El numero de factura inicia en `2026-201` y el Apps Script lleva el consecutivo revisando las facturas guardadas en `Asignaciones`.
+El numero de factura inicia en `2026-201` y se genera automaticamente cuando marcas una solicitud como `Pagado`. El Apps Script lleva el consecutivo con un contador interno y con las facturas guardadas en `Asignaciones`, para no reutilizar numeros.
 
 Si cambia el formulario, edita `FORM_URL` en `app.js`. Si cambia la hoja, edita `SHEET_ID` y `SHEET_GID` en `app.js` y `admin.js`.
