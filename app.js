@@ -353,15 +353,21 @@ function buildLockerStatus(rows) {
   const statusMap = new Map();
   const lockerColumn = detectLockerColumn(rows);
   const paymentColumn = detectColumn(rows, ["pago", "pagado", "payment"]);
+  const statusColumn = detectColumn(rows, ["estado", "estatus", "status"]);
 
   rows.forEach((row) => {
+    const rowState = statusColumn ? getReservationState(row[statusColumn]) : "";
+    if (rowState === "disponible") {
+      return;
+    }
+
     const id = extractLockerId(lockerColumn ? row[lockerColumn] : Object.values(row).join(" "));
     if (!id) {
       return;
     }
 
     const previous = statusMap.get(id) || { count: 0, paid: false };
-    const paid = paymentColumn ? isPaidValue(row[paymentColumn]) : false;
+    const paid = rowState === "pagado" || (paymentColumn ? isPaidValue(row[paymentColumn]) : false);
     statusMap.set(id, {
       count: previous.count + 1,
       paid: previous.paid || paid,
@@ -421,6 +427,20 @@ function extractLockerId(value) {
 function isPaidValue(value) {
   const normalized = normalize(value).replace(/\s+/g, "");
   return ["si", "s", "yes", "y", "true", "1", "pagado", "pago"].includes(normalized);
+}
+
+function getReservationState(value) {
+  const normalized = normalize(value).replace(/\s+/g, "");
+  if (["disponible", "libre", "cancelado", "cancelada"].includes(normalized)) {
+    return "disponible";
+  }
+  if (["pagado", "pago", "si"].includes(normalized)) {
+    return "pagado";
+  }
+  if (["reservado", "reserva", "pendiente"].includes(normalized)) {
+    return "reservado";
+  }
+  return "";
 }
 
 function normalize(value) {

@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Administrador de casilleros</title>
+    <meta
+      name="description"
+      content="Panel administrativo para asignar casilleros, actualizar pagos y preparar contratos."
+    />
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="admin.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Administraci&oacute;n</p>
+        <h1>Gesti&oacute;n de casilleros</h1>
+      </div>
+      <a class="source-link" href="index.html">Ver mapa p&uacute;blico</a>
+    </header>
+
+    <main class="page-shell admin-shell">
+      <section class="status-line admin-status-line" aria-live="polite">
+        <span id="admin-load-status">Cargando reservas desde Google Sheets...</span>
+        <span id="admin-updated-at"></span>
+      </section>
+
+      <section class="admin-workspace">
+        <section class="admin-panel reservation-panel" aria-label="Reservas recibidas">
+          <div class="admin-panel-header">
+            <div>
+              <p class="panel-kicker">Reservas</p>
+              <h2>Personas registradas</h2>
+            </div>
+            <button id="admin-refresh-button" class="refresh-button" type="button">
+              Actualizar
+            </button>
+          </div>
+
+          <label class="search-box admin-search">
+            <span>Buscar por nombre, correo, carne o casillero</span>
+            <input id="reservation-search" placeholder="Ej. Maria, B81234, 24" />
+          </label>
+
+          <div class="reservation-list" id="reservation-list"></div>
+        </section>
+
+        <section class="admin-panel assignment-panel" aria-label="Asignaci&oacute;n de casillero">
+          <div class="admin-panel-header">
+            <div>
+              <p class="panel-kicker">Asignaci&oacute;n</p>
+              <h2 id="selected-person-title">Selecciona una persona</h2>
+            </div>
+          </div>
+
+          <form id="assignment-form" class="assignment-form">
+            <label>
+              <span>Casillero asignado</span>
+              <select id="locker-select"></select>
+            </label>
+
+            <label>
+              <span>Estado</span>
+              <select id="status-select">
+                <option value="reservado">Reservado</option>
+                <option value="pagado">Pagado</option>
+                <option value="disponible">Disponible</option>
+              </select>
+            </label>
+
+            <label>
+              <span>Pago</span>
+              <select id="payment-select">
+                <option value="NO">NO</option>
+                <option value="SI">SI</option>
+              </select>
+            </label>
+
+            <label>
+              <span>Factura o recibo</span>
+              <input id="receipt-input" placeholder="Ej. 2026-001" />
+            </label>
+
+            <label>
+              <span>Monto pagado</span>
+              <input id="amount-input" placeholder="Ej. 5000" />
+            </label>
+
+            <label>
+              <span>Fecha de pago</span>
+              <input id="payment-date-input" type="date" />
+            </label>
+
+            <div class="assignment-actions">
+              <button id="save-sheet-button" class="refresh-button" type="submit">
+                Guardar en Sheet
+              </button>
+              <button id="copy-values-button" class="secondary-button" type="button">
+                Copiar valores
+              </button>
+              <a
+                class="secondary-link"
+                href="https://docs.google.com/spreadsheets/d/1sEH73Eyg8cRJe2as8wF0_YZA-TAYJbW2qq186MNIkhk/edit?usp=sharing"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Abrir Sheet
+              </a>
+            </div>
+
+            <p id="save-status" class="save-status" aria-live="polite"></p>
+          </form>
+        </section>
+      </section>
+
+      <section class="admin-panel contract-panel" aria-label="Contrato generado">
+        <div class="admin-panel-header">
+          <div>
+            <p class="panel-kicker">Contrato</p>
+            <h2>Vista de contrato</h2>
+          </div>
+          <button id="print-contract-button" class="refresh-button" type="button">
+            Imprimir
+          </button>
+        </div>
+        <div id="contract-preview" class="contract-sheet"></div>
+      </section>
+    </main>
+
+    <script src="admin.js"></script>
+  </body>
+</html>
