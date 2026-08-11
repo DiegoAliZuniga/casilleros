@@ -1,6 +1,6 @@
 const SHEET_ID = "1sEH73Eyg8cRJe2as8wF0_YZA-TAYJbW2qq186MNIkhk";
 const SHEET_GID = "0";
-const APPS_SCRIPT_URL = "";
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzsln0pIuvGu9c9xJipl4cY-U_nYVEzi_5a9dokjPDIU9clwtItRRWnCR72QDJbyLTPsg/exec";
 const ADMIN_TOKEN = "cambia-este-token";
 
 const LOCKERS = [
